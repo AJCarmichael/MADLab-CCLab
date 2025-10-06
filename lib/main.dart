@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'dashboard.dart'; // Make sure this exists and is properly implemented
 
 void main() async {
