@@ -174,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
-                        JsonEncoder.withIndent("  ").convert(_result),
+                        const JsonEncoder.withIndent("  ").convert(_result),
                         style: textTheme.bodySmall,
                       ),
                     ),
