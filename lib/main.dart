@@ -1,187 +1,270 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'dashboard.dart'; // Make sure this exists and is properly implemented
 
-void main() => runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final database = await initDatabase();
+  runApp(MyApp(database: database));
+}
 
-const String SERVER_URL = "https://YOUR_SERVER_URL/"; // change me
+// SQLite initialization
+Future<Database> initDatabase() async {
+  final dbPath = await getDatabasesPath();
+  return openDatabase(join(dbPath, 'app.db'), version: 1,
+      onCreate: (db, version) async {
+    await db.execute('''
+      CREATE TABLE user(
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        age INTEGER,
+        gender TEXT,
+        state TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE appliances(
+        id INTEGER PRIMARY KEY,
+        imagePath TEXT,
+        name TEXT,
+        description TEXT,
+        efficiencyStars INTEGER,
+        powerDraw INTEGER,
+        monthlyKWh REAL,
+        yearlyKWh REAL,
+        createdAt TEXT
+      )
+    ''');
+  });
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Database database;
+  const MyApp({super.key, required this.database});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "ApplianceID",
-      debugShowCheckedModeBanner: false,
+      title: 'Appliance Tracker',
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
-        primaryColor: Colors.white,
-        textTheme: ThemeData.dark().textTheme.apply(
-              fontFamily: "CustomFont",
-              bodyColor: Colors.white,
-              displayColor: Colors.white,
-            ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey.shade900,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
+        primarySwatch: Colors.teal,
+        fontFamily: 'MyCustomFont',
       ),
-      home: const HomePage(),
+      home: UserOnboarding(database: database),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+// Onboarding Screen
+class UserOnboarding extends StatefulWidget {
+  final Database database;
+  const UserOnboarding({super.key, required this.database});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  _UserOnboardingState createState() => _UserOnboardingState();
 }
 
-class _HomePageState extends State<HomePage> {
-  XFile? _picked;
-  Map<String, dynamic>? _result;
-  bool _loading = false;
-  String? _error;
+class _UserOnboardingState extends State<UserOnboarding> {
+  final _formKey = GlobalKey<FormState>();
+  String name = '', gender = 'Male', state = '';
+  int age = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Welcome')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Name'),
+                onSaved: (val) => name = val ?? '',
+                validator: (val) => val!.isEmpty ? 'Enter your name' : null,
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Age'),
+                keyboardType: TextInputType.number,
+                onSaved: (val) => age = int.tryParse(val ?? '0') ?? 0,
+                validator: (val) => val!.isEmpty ? 'Enter age' : null,
+              ),
+              DropdownButtonFormField(
+                initialValue: gender,
+                items: ['Male', 'Female', 'Other']
+                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                    .toList(),
+                onChanged: (val) => gender = val.toString(),
+                decoration: const InputDecoration(labelText: 'Gender'),
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'State'),
+                onSaved: (val) => state = val ?? '',
+                validator: (val) => val!.isEmpty ? 'Enter state' : null,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                  onPressed: () async {
+                    if (_formKey.currentState!.validate()) {
+                      _formKey.currentState!.save();
+                      await widget.database.insert('user', {
+                        'name': name,
+                        'age': age,
+                        'gender': gender,
+                        'state': state
+                      });
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                ApplianceScreen(database: widget.database)),
+                      );
+                    }
+                  },
+                  child: const Text('Start'))
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Appliance Capture & Dashboard
+class ApplianceScreen extends StatefulWidget {
+  final Database database;
+  const ApplianceScreen({super.key, required this.database});
+
+  @override
+  _ApplianceScreenState createState() => _ApplianceScreenState();
+}
+
+class _ApplianceScreenState extends State<ApplianceScreen> {
+  XFile? _pickedImage;
+  List<Map<String, dynamic>> appliances = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadAppliances();
+  }
+
+  Future<void> loadAppliances() async {
+    final data =
+        await widget.database.query('appliances', orderBy: 'createdAt DESC');
+    setState(() => appliances = data);
+  }
 
   Future<void> pickImage() async {
-    try {
-      final picker = ImagePicker();
-      final img = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1200,
-      );
-      if (img == null) return;
-      setState(() {
-        _picked = img;
-        _result = null;
-        _error = null;
-      });
-    } catch (e) {
-      setState(() => _error = "Failed to pick image: $e");
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.camera);
+    if (file != null) {
+      final dir = await getApplicationDocumentsDirectory();
+      final savedPath =
+          '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.png';
+      await File(file.path).copy(savedPath);
+      setState(() => _pickedImage = XFile(savedPath));
     }
   }
 
-  Future<void> uploadAndIdentify() async {
-    if (_picked == null) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
+  Future<void> sendToBackend() async {
+    if (_pickedImage == null) return;
     try {
-      final uri = Uri.parse("${SERVER_URL}identify");
-      final req = http.MultipartRequest("POST", uri);
-      req.files.add(await http.MultipartFile.fromPath("file", _picked!.path));
-
-      final streamed = await req.send();
-      final resp = await http.Response.fromStream(streamed);
-
-      if (resp.statusCode == 200) {
-        setState(() => _result = json.decode(resp.body));
-      } else {
-        setState(() => _error =
-            "Server error: ${resp.statusCode}\n${resp.body.substring(0, 200)}");
+      final user = (await widget.database.query('user')).first;
+      final response = await http.post(
+        Uri.parse('http://YOUR_VPS_IP:5678/webhook/appliance-info'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'image_path': _pickedImage!.path,
+          'state': user['state'],
+          'name': user['name'],
+          'age': user['age'],
+          'gender': user['gender'],
+        }),
+      );
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        await widget.database.insert('appliances', {
+          'imagePath': _pickedImage!.path,
+          'name': json['name'],
+          'description': json['description'],
+          'efficiencyStars': json['efficiencyStars'],
+          'powerDraw': json['powerDraw'],
+          'monthlyKWh': json['monthlyKWh'],
+          'yearlyKWh': json['yearlyKWh'],
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+        loadAppliances();
+        setState(() => _pickedImage = null);
       }
     } catch (e) {
-      setState(() => _error = "Upload failed: $e");
-    } finally {
-      setState(() => _loading = false);
+      ScaffoldMessenger.of(this.context)
+          .showSnackBar(SnackBar(content: Text('Failed to reach backend: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("ApplianceID", style: textTheme.headlineSmall),
-        centerTitle: true,
-        backgroundColor: Colors.black,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (_picked != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.file(File(_picked!.path),
-                      height: 220, fit: BoxFit.cover),
-                )
-              else
-                Container(
-                  height: 220,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade900,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Center(
-                    child: Text(
-                      "Take a photo of an appliance",
-                      style: textTheme.bodyLarge,
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 24),
-
-              // Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                      onPressed: pickImage, child: const Text("📷 Take Photo")),
-                  ElevatedButton(
-                    onPressed: _picked == null ? null : uploadAndIdentify,
-                    child: const Text("☁️ Identify"),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              if (_loading) const CircularProgressIndicator(),
-
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    _error!,
-                    style: textTheme.bodyMedium?.copyWith(color: Colors.red),
-                  ),
-                ),
-
-              if (_result != null)
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade900,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        const JsonEncoder.withIndent("  ").convert(_result),
-                        style: textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-                ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Appliances Dashboard'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Capture'),
+              Tab(text: 'Dashboard'),
             ],
           ),
+        ),
+        body: TabBarView(
+          children: [
+            // Capture Tab
+            Column(
+              children: [
+                if (_pickedImage != null)
+                  Image.file(File(_pickedImage!.path), height: 200),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(onPressed: pickImage, child: const Text('Take Photo')),
+                    const SizedBox(width: 20),
+                    ElevatedButton(onPressed: sendToBackend, child: const Text('Identify')),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: appliances.length,
+                    itemBuilder: (context, i) {
+                      final a = appliances[i];
+                      return Card(
+                        margin: const EdgeInsets.all(8),
+                        child: ListTile(
+                          leading: Image.file(File(a['imagePath'])),
+                          title: Text('${a['name']} (${a['efficiencyStars']}★)'),
+                          subtitle: Text(
+                              'Power: ${a['powerDraw']}W\nMonthly: ${a['monthlyKWh'].toStringAsFixed(1)} kWh'),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            // Dashboard Tab
+            Dashboard(appliances: appliances),
+          ],
         ),
       ),
     );

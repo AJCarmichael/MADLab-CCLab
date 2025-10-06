@@ -1,29 +1,27 @@
-name: appliance_id_app
-description: Appliance photo -> identify -> energy estimate
-publish_to: 'none' # remove if you plan to publish
+name: appliance_tracker
+description: Flutter app for appliance energy tracking
+publish_to: 'none'
+version: 1.0.0+1
 
-version: 0.0.1
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  image_picker: ^0.8.7+5
-  http: ^0.13.6
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^2.0.0
+  image_picker: ^1.1.1
+  http: ^1.1.0
+  sqflite: ^2.2.8+4
+  path_provider: ^2.0.15
+  fl_chart: ^1.1.1
+  path: ^1.8.3
 
 flutter:
   uses-material-design: true
   assets:
-    - ./assets/fonts/
-
+    - assets/fonts/
   fonts:
-    - family: CustomFont
+    - family: MyCustomFont
       fonts:
-        - asset: ./assets/fonts/nothing-font-5x7.ttf
+        - asset: assets/fonts/nothing-font-5x7.ttf
