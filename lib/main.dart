@@ -180,7 +180,7 @@ class _ApplianceScreenState extends State<ApplianceScreen> {
     try {
       final user = (await widget.database.query('user')).first;
       final response = await http.post(
-        Uri.parse('http://YOUR_VPS_IP:5678/webhook/appliance-info'),
+        Uri.parse('http://16.170.231.118:5678/webhook-test/appliance-info'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'image_path': _pickedImage!.path,
