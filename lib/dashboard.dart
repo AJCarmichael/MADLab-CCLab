@@ -47,7 +47,7 @@ class Dashboard extends StatelessWidget {
                         1.2,
                 barGroups: barGroups,
                 titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
+                  leftTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: true, reservedSize: 40),
                   ),
                   bottomTitles: AxisTitles(

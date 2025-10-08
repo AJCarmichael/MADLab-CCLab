@@ -80,6 +80,12 @@
       "languageVersion": "3.8"
     },
     {
+      "name": "flutter_lints",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/flutter_lints-3.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.1"
+    },
+    {
       "name": "flutter_plugin_android_lifecycle",
       "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.30",
       "packageUri": "lib/",
@@ -150,6 +156,12 @@
       "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/image_picker_windows-0.2.2",
       "packageUri": "lib/",
       "languageVersion": "3.6"
+    },
+    {
+      "name": "lints",
+      "rootUri": "file:///home/user/.pub-cache/hosted/pub.dev/lints-3.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "material_color_utilities",
